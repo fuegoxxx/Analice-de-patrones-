@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Análisis Avanzado de Patrones</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 15px;
+    background: #f5f5f5;
+    color: #333;
+  }
+  h2 {
+    color: #2c3e50;
+  }
+  label, select, input, textarea, button {
+    font-size: 1rem;
+    margin-top: 8px;
+  }
+  input, select, textarea {
+    padding: 6px;
+    width: 100%;
+    max-width: 300px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  textarea {
+    resize: vertical;
+  }
+  button {
+    background-color: #2980b9;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  button:hover {
+    background-color: #3498db;
+  }
+  section {
+    background: white;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  th {
+    background-color: #2980b9;
+    color: white;
+  }
+  .actions-btn {
+    background-color: #e74c3c;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    color: white;
+  }
+  .actions-btn.edit {
+    background-color: #27ae60;
+  }
+  @media (max-width: 600px) {
+    input, select, textarea, button {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+  <h2>Análisis Avanzado de Patrones de Trading</h2>
+
+  <section aria-label="Formulario para agregar o editar patrón">
+    <form id="patternForm">
+      <input type="hidden" id="editIndex" value="-1"/>
+      <label for="patron">Patrón detectado:</label>
+      <select id="patron" required>
+        <option value="">Seleccione un patrón</option>
+        <option value="Triángulo">Triángulo</option>
+        <option value="Hombro-Cabeza-Hombro">Hombro-Cabeza-Hombro</option>
+        <option value="Doble Piso">Doble Piso</option>
+        <option value="Bandera">Bandera</option>
+        <option value="Canal">Canal</option>
+      </select><br/><br/>
+
+      <label for="instrumento">Instrumento:</label>
+      <input type="text" id="instrumento" placeholder="Ejemplo: EUR/USD" required /><br/><br/>
+
+      <label for="fecha">Fecha:</label>
+      <input type="date" id="fecha" required /><br/><br/>
+
+      <label for="comentario">Comentario:</label><br/>
+      <textarea id="comentario" rows="4" placeholder="Añade comentarios..." ></textarea><br/><br/>
+
+      <button type="submit" id="submitBtn">Agregar Patrón</button>
+      <button type="button" id="cancelBtn" style="display:none; margin-left: 10px;">Cancelar</button>
+    </form>
+  </section>
+
+  <section aria-label="Filtros de patrones">
+    <label for="filterPatron">Filtrar por patrón:</label>
+    <select id="filterPatron">
+      <option value="">Todos</option>
+      <option value="Triángulo">Triángulo</option>
+      <option value="Hombro-Cabeza-Hombro">Hombro-Cabeza-Hombro</option>
+      <option value="Doble Piso">Doble Piso</option>
+      <option value="Bandera">Bandera</option>
+      <option value="Canal">Canal</option>
+    </select>
+
+    <label for="filterInstrumento" style="margin-left:20px;">Filtrar por instrumento:</label>
+    <input type="text" id="filterInstrumento" placeholder="Ej: EUR/USD" />
+
+    <button id="clearFilters">Limpiar filtros</button>
+  </section>
+
+  <section aria-label="Lista de patrones guardados">
+    <h3>Patrones guardados:</h3>
+    <table id="patronTable" role="grid" aria-describedby="tableDesc">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Patrón</th>
+          <th>Instrumento</th>
+          <th>Comentario</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p id="emptyMsg" style="display:none;">No hay patrones guardados.</p>
+  </section>
+
+  <section aria-label="Exportar o importar patrones">
+    <button id="exportBtn">Exportar Patrones (JSON)</button>
+    <input type="file" id="importFile" accept=".json" style="display:none;" />
+    <button id="importBtn">Importar Patrones (JSON)</button>
+  </section>
+
+  <script>
+    const patternForm = document.getElementById('patternForm');
+    const editIndexInput = document.getElementById('editIndex');
+    const patronSelect = document.getElementById('patron');
+    const instrumentoInput = document.getElementById('instrumento');
+    const fechaInput = document.getElementById('fecha');
+    const comentarioInput = document.getElementById('comentario');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    const filterPatron = document.getElementById('filterPatron');
+    const filterInstrumento = document.getElementById('filterInstrumento');
+    const clearFiltersBtn = document.getElementById('clearFilters');
+
+    const patronTableBody = document.querySelector('#patronTable tbody');
+    const emptyMsg = document.getElementById('emptyMsg');
+
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importFileInput = document.getElementById('importFile');
+
+    let patronesArray = JSON.parse(localStorage.getItem('patronesTrading')) || [];
+
+    function saveLocalStorage() {
+      localStorage.setItem('patronesTrading', JSON.stringify(patronesArray));
+    }
+
+    function renderTable() {
+      patronTableBody.innerHTML = '';
+      let filteredPatrones = patronesArray;
+
+      if(filterPatron.value) {
+        filteredPatrones = filteredPatrones.filter(p => p.patron === filterPatron.value);
+      }
+      if(filterInstrumento.value.trim()) {
+        filteredPatrones = filteredPatrones.filter(p => p.instrumento.toLowerCase().includes(filterInstrumento.value.trim().toLowerCase()));
+      }
+
+      if(filteredPatrones.length === 0) {
+        emptyMsg.style.display = 'block';
+      } else {
+        emptyMsg.style.display = 'none';
+        filteredPatrones.forEach((p, index) => {
+          const tr = document.createElement('tr');
+
+          const tdFecha = document.createElement('td');
+          tdFecha.textContent = p.fecha;
+          tr.appendChild(tdFecha);
+
+          const tdPatron = document.createElement('td');
+          tdPatron.textContent = p.patron;
+          tr.appendChild(tdPatron);
+
+          const tdInstrumento = document.createElement('td');
+          tdInstrumento.textContent = p.instrumento;
+          tr.appendChild(tdInstrumento);
+
+          const tdComentario = document.createElement('td');
+          tdComentario.textContent = p.comentario;
+          tr.appendChild(tdComentario);
+
+          const tdActions = document.createElement('td');
+          const editBtn = document.createElement('button');
+          editBtn.textContent = 'Editar';
+          editBtn.className = 'actions-btn edit';
+          editBtn.addEventListener('click', () => startEdit(index));
+
+          const delBtn = document.createElement('button');
+          delBtn.textContent = 'Eliminar';
+          delBtn.className = 'actions-btn';
+          delBtn.style.marginLeft = '6px';
+          delBtn.addEventListener('click', () => deletePattern(index));
+
+          tdActions.appendChild(editBtn);
+          tdActions.appendChild(delBtn);
+          tr.appendChild(tdActions);
+
+          patronTableBody.appendChild(tr);
+        });
+      }
+    }
+
+    function startEdit(index) {
+      const p = patronesArray[index];
+      editIndexInput.value = index;
+      patronSelect.value = p.patron;
+      instrumentoInput.value = p.instrumento;
+      fechaInput.value = p.fecha;
+      comentarioInput.value = p.comentario;
+      submitBtn.textContent = 'Guardar Cambios';
+      cancelBtn.style.display = 'inline-block';
+    }
+
+    function clearForm() {
+      editIndexInput.value = -1;
+      patronSelect.value = '';
+      instrumentoInput.value = '';
+      fechaInput.value = '';
+      comentarioInput.value = '';
+      submitBtn.textContent = 'Agregar Patrón';
+      cancelBtn.style.display = 'none';
+    }
+
+    function deletePattern(index) {
+      if (confirm('¿Quieres eliminar este patrón?')) {
+        patronesArray.splice(index, 1);
+        saveLocalStorage();
+        renderTable();
+        if(editIndexInput.value == index) {
+          clearForm();
+        }
+      }
+    }
+
+    patternForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const patron = patronSelect.value;
+      const instrumento = instrumentoInput.value.trim();
+      const fecha = fechaInput.value;
+      const comentario = comentarioInput.value.trim();
+
+      if (!patron || !instrumento || !fecha) {
+        alert('Completa todos los campos obligatorios');
+        return;
+      }
+
+      const newPatron = { patron, instrumento, fecha, comentario };
+
+      const editIndex = parseInt(editIndexInput.value);
+      if(editIndex >= 0) {
+        patronesArray[editIndex] = newPatron;
+      } else {
+        patronesArray.push(newPatron);
+      }
+
+      saveLocalStorage();
+      renderTable();
+      clearForm();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      clearForm();
+    });
+
+    filterPatron.addEventListener('change', renderTable);
+    filterInstrumento.addEventListener('input', renderTable);
+    clearFiltersBtn.addEventListener('click', () => {
+      filterPatron.value = '';
+      filterInstrumento.value = '';
+      renderTable();
+    });
+
+    exportBtn.addEventListener('click', () => {
+      const dataStr = JSON.stringify(patronesArray, null, 2);
+      const blob = new Blob([dataStr], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'patrones-trading.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    importBtn.addEventListener('click', () => {
+      importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', () => {
+      const file = importFileInput.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if(Array.isArray(importedData)) {
+            patronesArray = importedData;
+            saveLocalStorage();
+            renderTable();
+            alert('Importación exitosa');
+          } else {
+            alert('El archivo JSON no es válido');
+          }
+        } catch(error) {
+          alert('Error al leer el archivo JSON');
+        }
+      };
+      reader.readAsText(file);
+      importFileInput.value = '';
+    });
+
+    // Inicializar tabla
+    renderTable();
+  </script>
+</body>
+</html>
